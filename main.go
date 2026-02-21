@@ -67,12 +67,65 @@ func main() {
 		auth.POST("/upload", uploadImage)
 		auth.POST("/notes/:id/like", likeNote)
 		auth.POST("/follow/:id", FollowUser)
+		auth.GET("/following", getFollows)
+		auth.GET("/fans", getFans)
 	}
 
 	r.Run(":8080")
 }
 
 var followTaskChannel = make(chan models.Follow, 1000)
+
+func getFans(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(500, gin.H{"error": "未登录"})
+		return
+	}
+
+	var follows []models.Follow
+	var users []models.User
+
+	db.Where("followed_id = ?", userID).Find(&follows)
+
+	if len(follows) == 0 {
+		c.JSON(200, gin.H{"data": []models.User{},
+			"message": "还没有粉丝"})
+		return
+	}
+
+	var ids []uint
+
+	for _, f := range follows {
+		ids = append(ids, f.FollowerID)
+	}
+
+	db.Where("id IN ?", ids).Find(&users)
+	//to do 敏感信息处理
+	c.JSON(200, gin.H{"data": users})
+}
+
+func getFollows(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(500, gin.H{"error": "未登录"})
+		return
+	}
+
+	var follows []models.Follow
+	var users []models.User
+
+	db.Where("follower_id = ?", userID).Find(&follows)
+
+	var ids []uint
+	for _, f := range follows {
+		ids = append(ids, f.FollowedID)
+	}
+
+	db.Where("id IN ?", ids).Find(&users)
+	//to do 敏感信息处理
+	c.JSON(200, gin.H{"data": users})
+}
 
 func FollowUser(c *gin.Context) {
 	targetID, _ := strconv.Atoi(c.Param("id"))
